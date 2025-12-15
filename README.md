@@ -43,9 +43,9 @@ pip show vllm ollama httpx pandas matplotlib
 
 ⸻
 
-##Server configuration
+## Server configuration
 
-###vLLM server
+### vLLM server
 ```bash
 source .venv/bin/activate
 
@@ -68,23 +68,23 @@ OLLAMA_HOST=0.0.0.0:11434 ollama pull aleSuglia/qwen2-vl-2b-instruct-q4_k_m
 
 ⸻
 
-##Benchmark script
+## Benchmark script
 
-Benchmark runner: bench_qwen_vllm_vs_ollama.py
+### Benchmark runner: bench_qwen_vllm_vs_ollama.py
 
-Key parameters (from script)
+### Key parameters (from script)
 	•	Duration per concurrency level: DURATION_SEC = 60
 	•	Concurrency sweep: CONCURRENCY_LEVELS = [1, 2, 4, 8, 16, 32]
 	•	Temperature: TEMPERATURE = 0.1
 	•	Max output tokens: MAX_TOKENS = 256
 	•	Prompt set: currently a single prompt (PROMPTS = [PROMPT])
 
-Run benchmark
-
+### Run benchmark
+```bash
 source .venv/bin/activate
 python bench_qwen_vllm_vs_ollama.py
-
-Outputs:
+```
+### Outputs:
 	•	qwen_vllm_vs_ollama_results.csv (script writes a CSV at the end)
 
 CSV includes:
@@ -94,19 +94,19 @@ CSV includes:
 
 ⸻
 
-##Plotting
+## Plotting
 
 Once you have the CSV, run the plotting script (example):
-
+```bash
 python plot_qwen_bench.py
-
-Outputs:
+```
+### Outputs:
 	•	qwen_throughput_vs_concurrency.png
 	•	qwen_p95_latency_vs_concurrency.png
 
 ⸻
 
-##Methodology notes
+## Methodology notes
 	•	API: POST /v1/chat/completions
 	•	Non-streaming requests (stream=false)
 	•	Latency: end-to-end wall clock per request
@@ -116,28 +116,28 @@ Outputs:
 
 ⸻
 
-##Capturing logs (recommended)
+## Capturing logs (recommended)
 
-I initially ran the benchmark from terminal without saving logs. For reproducibility, capture stdout/stderr:
-
+Run the benchmark from terminal without saving logs. For reproducibility, capture stdout/stderr:
+```bash
 mkdir -p logs
 python bench_qwen_vllm_vs_ollama.py 2>&1 | tee logs/bench_run_$(date +%Y%m%d_%H%M%S).log
-
+```
 Also capture server logs:
 
-# vLLM server
+### vLLM server
+```bash
 vllm serve ... 2>&1 | tee logs/vllm_server_$(date +%Y%m%d_%H%M%S).log
-
-# Ollama server
+```
+### Ollama server
+```bash
 OLLAMA_HOST=0.0.0.0:11434 ollama serve 2>&1 | tee logs/ollama_server_$(date +%Y%m%d_%H%M%S).log
-
-
+```
 ⸻
 
-##Limitations / fairness
+## Limitations / fairness
 	•	vLLM uses HF weights; Ollama uses GGUF quantized model → performance will differ due to quantization and runtime.
 	•	These are VL models, but this run uses text-only prompts (no images).
 	•	Single-node serving per engine (in this setup).
-
 ⸻
 
