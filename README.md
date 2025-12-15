@@ -1,80 +1,55 @@
-# LLM Serving Benchmark on Lightning AI: vLLM vs Ollama
 
-This repo contains an end-to-end, reproducible benchmark I ran on **Lightning AI (Studio)** to compare:
+# Benchmark: vLLM vs Ollama on Lightning AI (A100 80GB) — Qwen2-VL-2B
+
+This repository contains a reproducible benchmark I ran on **Lightning AI** using an **NVIDIA A100 (80GB VRAM)** GPU cluster to compare:
 
 - **vLLM** (OpenAI-compatible server)
 - **Ollama** (OpenAI-compatible server)
 
-I measure:
+The benchmark measures:
 - **Latency** (avg / p50 / p90 / p95 / p99)
-- **Throughput** (**requests/sec** and **tokens/sec**)
-- Scaling across **concurrency** levels
+- **Throughput** (requests/sec and output tokens/sec)
+- Scaling across multiple **concurrency** levels
 
 ---
 
-## What I benchmarked
+## Models used (this run)
 
-### Model (same family on both)
-To keep things lightweight and easy to run on a single GPU:
+### vLLM
+- Model: `Qwen/Qwen2-VL-2B-Instruct`
+- Endpoint: `http://localhost:8000/v1/chat/completions`
 
-- **vLLM:** `meta-llama/Llama-3.2-1B-Instruct` (HF weights)
-- **Ollama:** `llama3.2:1b` (GGUF quantized variant)
+### Ollama
+- Model: `aleSuglia/qwen2-vl-2b-instruct-q4_k_m` (GGUF quantized)
+- Endpoint: `http://localhost:11434/v1/chat/completions`
 
-> Note: Ollama typically serves a quantized build (e.g., Q8_0), while vLLM may use FP16/BF16. This can affect throughput/latency; I call it out in the results discussion.
+> Note: This is not perfectly apples-to-apples at the kernel level because Ollama serves a quantized GGUF build, while vLLM serves HF weights (typically FP16/BF16). The intent is to compare serving stacks and concurrency behavior.
 
 ---
 
-## Repo structure
+## Hardware / environment
 
-```text
-.
-├── bench_llama32_1b_vllm_vs_ollama.py       # benchmark runner (latency + throughput)
-├── plot_llama32_1b_bench.py                 # plots (PNG) for article
-├── llama32_1b_vllm_vs_ollama_results.csv    # generated results (after benchmark run)
-└── README.md
+- Platform: Lightning AI
+- GPU: NVIDIA A100 80GB VRAM (cluster)
+- OS: Lightning Studio runtime
+- Benchmark client: `httpx` + asyncio workers
 
 
-⸻
-
-Hardware / Environment
-	•	Platform: Lightning AI Studio
-	•	GPU: (Fill in: A10 / L4 / A100 / etc.)
-	•	OS Image: Lightning Studio default
-	•	Python: 3.x (recommend 3.10+)
-
-Record the exact environment for your article:
-
+```bash
 nvidia-smi
 python -V
 pip show vllm ollama httpx pandas matplotlib
-
-
-⸻
-
-Setup on Lightning AI Studio
-
-1) Create a Lightning Studio (GPU)
-	•	Create a new AI Studio workspace
-	•	Choose any GPU (A10/L4/A100). 1B models run comfortably on most.
-
-2) Create a virtualenv + install deps
-
-python -m venv .venv
-source .venv/bin/activate
-
-pip install --upgrade pip
-pip install "vllm>=0.6.2" httpx pandas matplotlib
-
+```
 
 ⸻
 
-Start vLLM server
+##Server configuration
 
-Open Terminal 1:
-
+###vLLM server
+```bash
 source .venv/bin/activate
 
-MODEL_ID="meta-llama/Llama-3.2-1B-Instruct"
+MODEL_ID="Qwen/Qwen2-VL-2B-Instruct"
 
 vllm serve "$MODEL_ID" \
   --host 0.0.0.0 \
@@ -82,136 +57,87 @@ vllm serve "$MODEL_ID" \
   --max-model-len 4096 \
   --gpu-memory-utilization 0.9
 
-Endpoint:
-	•	http://localhost:8000/v1/chat/completions
+Ollama server
 
-⸻
-
-Start Ollama server
-
-Open Terminal 2:
-
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Start server
+# Terminal 1: start ollama server
 OLLAMA_HOST=0.0.0.0:11434 ollama serve
 
-Open Terminal 3:
-
-# Pull the lightweight 1B model
-OLLAMA_HOST=0.0.0.0:11434 ollama pull llama3.2:1b
-
-Endpoint:
-	•	http://localhost:11434/v1/chat/completions
+# Terminal 2: pull model
+OLLAMA_HOST=0.0.0.0:11434 ollama pull aleSuglia/qwen2-vl-2b-instruct-q4_k_m
+```
 
 ⸻
 
-Run the benchmark
+##Benchmark script
 
-Benchmark config
+Benchmark runner: bench_qwen_vllm_vs_ollama.py
 
-In bench_llama32_1b_vllm_vs_ollama.py you can edit:
-	•	DURATION_SEC (default: 60s per concurrency)
-	•	CONCURRENCY_LEVELS (default: [1,2,4,8,16,32])
-	•	MAX_TOKENS (default: 256)
-	•	Prompt set in PROMPTS
+Key parameters (from script)
+	•	Duration per concurrency level: DURATION_SEC = 60
+	•	Concurrency sweep: CONCURRENCY_LEVELS = [1, 2, 4, 8, 16, 32]
+	•	Temperature: TEMPERATURE = 0.1
+	•	Max output tokens: MAX_TOKENS = 256
+	•	Prompt set: currently a single prompt (PROMPTS = [PROMPT])
 
-Execute
+Run benchmark
 
 source .venv/bin/activate
-python bench_llama32_1b_vllm_vs_ollama.py
+python bench_qwen_vllm_vs_ollama.py
 
 Outputs:
-	•	llama32_1b_vllm_vs_ollama_results.csv
+	•	qwen_vllm_vs_ollama_results.csv (script writes a CSV at the end)
 
-CSV columns include:
-	•	engine, model_name, concurrency
-	•	avg_latency_ms, p50_latency_ms, p90_latency_ms, p95_latency_ms, p99_latency_ms
-	•	requests_per_s, tokens_per_s
-	•	num_requests, total_output_tokens, wall_time_s
-
-⸻
-
-Generate graphs (for article)
-
-source .venv/bin/activate
-python plot_llama32_1b_bench.py
-
-Generated images:
-	•	llama32_1b_throughput_vs_concurrency.png
-	•	llama32_1b_p95_latency_vs_concurrency.png
+CSV includes:
+	•	latency: avg / p50 / p90 / p95 / p99 (ms)
+	•	throughput: requests/sec and tokens/sec
+	•	total requests and wall time
 
 ⸻
 
-Methodology notes (important for writing)
+##Plotting
 
-Request type
-	•	Uses non-streaming chat.completions requests (stream=False)
-	•	Measures end-to-end latency from request send → response received
+Once you have the CSV, run the plotting script (example):
 
-Throughput
-	•	requests_per_s = total requests / wall time
-	•	tokens_per_s = total output tokens / wall time (uses usage when available)
+python plot_qwen_bench.py
 
-If Ollama usage fields differ on your version, the script includes a fallback for alternate usage keys.
-
-Fairness considerations
-	•	Same model family and same general task prompts
-	•	Quantization differences (Ollama GGUF vs vLLM FP16/BF16) are noted
-	•	Concurrency scaling is the main focus
+Outputs:
+	•	qwen_throughput_vs_concurrency.png
+	•	qwen_p95_latency_vs_concurrency.png
 
 ⸻
 
-Troubleshooting
-
-Port already in use
-
-Change ports in the server commands:
-	•	vLLM: --port 8001
-	•	Ollama: set OLLAMA_HOST=0.0.0.0:11435
-
-Update the base URLs inside the benchmark script accordingly.
-
-Hugging Face model access
-
-Some Meta models require HF authentication. If you get auth errors:
-
-pip install -U huggingface_hub
-huggingface-cli login
-
-Or set HF_TOKEN in your environment.
-
-Kernel / process crashes
-	•	Reduce CONCURRENCY_LEVELS (e.g., stop at 16)
-	•	Reduce MAX_TOKENS
-	•	Use shorter prompts
-	•	Ensure GPU memory is not exhausted (check nvidia-smi)
+##Methodology notes
+	•	API: POST /v1/chat/completions
+	•	Non-streaming requests (stream=false)
+	•	Latency: end-to-end wall clock per request
+	•	Throughput:
+	•	requests_per_s = total_requests / wall_time_s
+	•	tokens_per_s = total_output_tokens / wall_time_s (from usage when available)
 
 ⸻
 
-How to cite / reproduce in an article
+##Capturing logs (recommended)
 
-Include:
-	•	Lightning Studio GPU type + region (if relevant)
-	•	vLLM version, Ollama version
-	•	Model identifiers
-	•	Benchmark script parameters (duration, concurrency, max_tokens)
-	•	Graphs: throughput vs concurrency, p95/p99 latency vs concurrency
+I initially ran the benchmark from terminal without saving logs. For reproducibility, capture stdout/stderr:
 
-⸻
+mkdir -p logs
+python bench_qwen_vllm_vs_ollama.py 2>&1 | tee logs/bench_run_$(date +%Y%m%d_%H%M%S).log
 
-License
+Also capture server logs:
 
-Choose one:
-	•	MIT
-	•	Apache-2.0
-	•	Or leave unlicensed for now
+# vLLM server
+vllm serve ... 2>&1 | tee logs/vllm_server_$(date +%Y%m%d_%H%M%S).log
+
+# Ollama server
+OLLAMA_HOST=0.0.0.0:11434 ollama serve 2>&1 | tee logs/ollama_server_$(date +%Y%m%d_%H%M%S).log
+
 
 ⸻
 
-Acknowledgements
-	•	Lightning AI (Studio runtime)
-	•	vLLM project
-	•	Ollama project
+##Limitations / fairness
+	•	vLLM uses HF weights; Ollama uses GGUF quantized model → performance will differ due to quantization and runtime.
+	•	These are VL models, but this run uses text-only prompts (no images).
+	•	Single-node serving per engine (in this setup).
 
-If you want, paste your **actual GPU type** (A10/L4/A100) + the **CSV** you generated, and I’ll update the README with a “Results” section containing a clean table + the exact numbers you observed.
+⸻
+
