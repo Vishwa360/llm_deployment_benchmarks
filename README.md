@@ -94,15 +94,17 @@ CSV includes:
 
 ⸻
 
-## Plotting
+## Benchmark Results & Plots
 
 Once you have the CSV, run the plotting script (example):
 ```bash
 python plot_qwen_bench.py
 ```
-### Outputs:
-	•	qwen_throughput_vs_concurrency.png
-	•	qwen_p95_latency_vs_concurrency.png
+### Throughput vs Concurrency
+![Throughput vs Concurrency](./qwen_throughput_vs_concurrency.png)
+
+### P95 Latency vs Concurrency
+![P95 Latency vs Concurrency](./qwen_p95_latency_vs_concurrency.png)
 
 ⸻
 
